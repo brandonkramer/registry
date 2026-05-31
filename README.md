@@ -2,14 +2,6 @@
 
 Thread-safe generic name registry with optional validation, key extraction, and duplicate policy.
 
-## Install
-
-From [pkg.go.dev](https://pkg.go.dev/github.com/brandonkramer/registry):
-
-```bash
-go get github.com/brandonkramer/registry
-```
-
 ## Quick start
 
 ```go
@@ -41,10 +33,3 @@ snap := reg.Snapshot() // safe map copy for iteration
 | `WithRejectDuplicates()` | `Register` returns `ErrExists` instead of replacing |
 
 By default, registering the same name **replaces** the previous value.
-
-## Development
-
-```bash
-make check
-make install-hooks
-```
