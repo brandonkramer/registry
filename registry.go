@@ -14,9 +14,11 @@ import (
 
 // Registry maps unique names to registered values.
 type Registry[T any] struct {
-	mu       sync.RWMutex
-	m        map[string]T
-	validate func(T) error
+	mu        sync.RWMutex
+	m         map[string]T
+	validate  func(T) error
+	keyFrom   func(T) string
+	rejectDup bool
 }
 
 // New returns an empty registry configured by opts.
@@ -28,7 +30,8 @@ func New[T any](opts ...Option[T]) *Registry[T] {
 	return r
 }
 
-// Register stores item under name.
+// Register stores item under name. By default an existing name is replaced;
+// use [WithRejectDuplicates] to return [ErrExists] instead.
 func (r *Registry[T]) Register(name string, item T) error {
 	if r.validate != nil {
 		if err := r.validate(item); err != nil {
@@ -36,14 +39,38 @@ func (r *Registry[T]) Register(name string, item T) error {
 		}
 	}
 	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.rejectDup {
+		if _, ok := r.m[name]; ok {
+			return fmt.Errorf("registry: register %q: %w", name, ErrExists)
+		}
+	}
 	r.m[name] = item
-	r.mu.Unlock()
 	return nil
+}
+
+// RegisterItem stores item under the key returned by [WithKeyFrom].
+func (r *Registry[T]) RegisterItem(item T) error {
+	if r.keyFrom == nil {
+		return fmt.Errorf("registry: RegisterItem: %w", ErrNoKeyFrom)
+	}
+	name := r.keyFrom(item)
+	if name == "" {
+		return fmt.Errorf("registry: RegisterItem: empty key")
+	}
+	return r.Register(name, item)
 }
 
 // MustRegister panics when [Register] fails.
 func (r *Registry[T]) MustRegister(name string, item T) {
 	if err := r.Register(name, item); err != nil {
+		panic(err)
+	}
+}
+
+// MustRegisterItem panics when [RegisterItem] fails.
+func (r *Registry[T]) MustRegisterItem(item T) {
+	if err := r.RegisterItem(item); err != nil {
 		panic(err)
 	}
 }
@@ -98,4 +125,12 @@ func (r *Registry[T]) Values() []T {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return slices.Collect(maps.Values(r.m))
+}
+
+// Snapshot returns a shallow copy of the registered map safe for iteration
+// without holding the registry lock during callbacks.
+func (r *Registry[T]) Snapshot() map[string]T {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return maps.Clone(r.m)
 }

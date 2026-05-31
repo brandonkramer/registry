@@ -55,7 +55,3 @@ Thumbs.db
 # Lefthook local overrides (optional per-machine config)
 lefthook-local.yml
 lefthook-local.yaml
-
-# Registry flock sidecars (known-homes.json.lock, etc.)
-.lock
-*.lock
